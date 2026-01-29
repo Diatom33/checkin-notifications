@@ -1,0 +1,5 @@
+# Private channel configuration
+.channel
+
+# Generated skill file (contains private channel name)
+*.skill
