@@ -1,6 +1,6 @@
 # Check-in Notifications
 
-A Claude skill for sending persistent, snoozeable notifications via [ntfy.sh](https://ntfy.sh). Designed for accountability check-ins with snooze buttons and backup pings.
+A Claude skill for sending persistent, snoozeable notifications via [ntfy.sh](https://ntfy.sh). Designed for accountability check-ins with snooze buttons and backup pings. If using in claude.ai, use with the check-in style [here](https://github.com/Diatom33/system-prompts/blob/main/Claude/checkin.md).
 
 ## Setup
 
