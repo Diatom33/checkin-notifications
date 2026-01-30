@@ -185,97 +185,74 @@ chmod +x "$TEMP_DIR/scripts/"*.sh
 cat > "$TEMP_DIR/SKILL.md" << TEMPLATE
 ---
 name: checkin-notifications
-description: Send persistent, snoozeable notifications via ntfy.sh for accountability check-ins. Use when scheduling check-in reminders, sending notifications with snooze options, or managing delayed/scheduled notifications. Supports staggered delivery for persistence and action buttons for snooze-from-phone.
+description: Send persistent, snoozeable notifications via ntfy.sh for accountability check-ins. Run the bash scripts in scripts/ to send notifications. Supports scheduled delivery, snooze buttons, and backup pings.
 ---
 
 # Check-in Notifications via ntfy.sh
 
-Send notifications to topic \`$TOPIC\` with persistence and snooze capabilities.
+Send notifications to ntfy.sh topic \`$TOPIC\`. **Run these scripts using the Bash tool.**
 
-## Scripts
+All scripts use Priority 4 (high) by default.
 
-All scripts use Priority 4 (high) by default for prominent phone buzzing.
+## Primary Scripts
 
-### send.sh - Basic notification
+**schedule_snooze.sh** - Schedule a notification with snooze buttons (5m/15m/30m)
 \`\`\`bash
-scripts/send.sh <message> [title]
+bash scripts/schedule_snooze.sh <delay> <message> [sequence_id] [title]
+# Example: bash scripts/schedule_snooze.sh 45m "Time for a check-in!" "next-checkin" "Check-in"
 \`\`\`
 
-### send_snooze.sh - Notification with snooze buttons (5m/15m/30m)
+**cancel_backups.sh** - Cancel pending backup pings (call when user arrives)
 \`\`\`bash
-scripts/send_snooze.sh <message> [title]
+bash scripts/cancel_backups.sh [session_id]
 \`\`\`
 
-### schedule.sh - Schedule basic notification for later
+## Other Scripts
+
+**send.sh** - Send immediate notification
 \`\`\`bash
-scripts/schedule.sh <delay> <message> [sequence_id] [title]
-# Delay format: 5m, 1h, 30s, etc.
+bash scripts/send.sh <message> [title]
 \`\`\`
 
-### schedule_snooze.sh - Schedule notification with snooze buttons
-**This is the primary script for adaptive check-in scheduling.**
+**send_snooze.sh** - Send immediate notification with snooze buttons
 \`\`\`bash
-scripts/schedule_snooze.sh <delay> <message> [sequence_id] [title]
-# Delay format: 5m, 1h, 30s, etc.
-# Example: scripts/schedule_snooze.sh 45m "Time for a check-in!" "next-checkin"
+bash scripts/send_snooze.sh <message> [title]
 \`\`\`
 
-### cancel.sh - Cancel scheduled notification
+**schedule.sh** - Schedule notification (no snooze buttons)
 \`\`\`bash
-scripts/cancel.sh <sequence_id>
+bash scripts/schedule.sh <delay> <message> [sequence_id] [title]
 \`\`\`
 
-### start_checkin.sh - Full check-in flow (immediate)
-Sends primary notification with snooze buttons + backup pings at +5m and +10m.
+**cancel.sh** - Cancel a specific scheduled notification
 \`\`\`bash
-scripts/start_checkin.sh <message> [session_id] [title]
-# Session ID creates unique sequence IDs (default: "checkin")
-# Creates: {session}-primary, {session}-backup1, {session}-backup2
+bash scripts/cancel.sh <sequence_id>
 \`\`\`
 
-### cancel_backups.sh - Cancel backup pings
-Call when user arrives to cancel pending backups. Includes 2s sleep for race condition.
+**start_checkin.sh** - Immediate notification + backup pings at +5m and +10m
 \`\`\`bash
-scripts/cancel_backups.sh [session_id]
+bash scripts/start_checkin.sh <message> [session_id] [title]
 \`\`\`
 
-## Typical Adaptive Check-in Workflow
+## Typical Workflow
 
-1. User arrives after notification -> cancel any pending backups:
+1. User arrives after notification → cancel pending backups:
    \`\`\`bash
-   scripts/cancel_backups.sh "session-id"
+   bash scripts/cancel_backups.sh
    \`\`\`
 
 2. Conduct check-in conversation
 
-3. Schedule next check-in with snooze buttons:
+3. Schedule next check-in:
    \`\`\`bash
-   scripts/schedule_snooze.sh 45m "How's it going?" "next-checkin" "Check-in time"
+   bash scripts/schedule_snooze.sh 45m "How's it going?" "next-checkin" "Check-in"
    \`\`\`
 
-## For Immediate Check-ins
+## Notes
 
-Use \`start_checkin.sh\` when you need to ping right now with backup persistence:
-\`\`\`bash
-scripts/start_checkin.sh "How's it going?" "afternoon-checkin"
-\`\`\`
-
-## Scheduling for Absolute Time
-
-Use \`At:\` header directly for absolute times:
-\`\`\`bash
-curl -s -H "At: 3:30pm" -H "Priority: 4" -d "Check-in!" ntfy.sh/$TOPIC
-\`\`\`
-
-## Race Condition Warning
-
-If scheduling and canceling in the same bash invocation, add \`sleep 2\` between them. The scheduler needs time to index messages before DELETE works. The \`cancel_backups.sh\` script handles this automatically.
-
-## Priority Levels
-
-1 (min), 2 (low), 3 (default), 4 (high), 5 (urgent/bypasses DND)
-
-Always use Priority 4+ for real check-ins.
+- Delay format: 5m, 1h, 30s, etc.
+- Priority levels: 1-5 (scripts default to 4, which causes prominent buzzing)
+- For absolute times, use curl directly with \`-H "At: 3:30pm"\`
 TEMPLATE
 
 # Create .skill file (zip archive)
