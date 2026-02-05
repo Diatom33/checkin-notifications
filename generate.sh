@@ -41,9 +41,9 @@ MESSAGE="\${1:?Usage: send.sh <message> [title]}"
 TITLE="\${2:-}"
 
 if [ -n "\$TITLE" ]; then
-    curl -s -H "Priority: 4" -H "Title: \$TITLE" -d "\$MESSAGE" "ntfy.sh/\$TOPIC"
+    curl -s -H "Priority: 4" -H "Title: \$TITLE" -d "\$MESSAGE" "https://ntfy.sh/\$TOPIC"
 else
-    curl -s -H "Priority: 4" -d "\$MESSAGE" "ntfy.sh/\$TOPIC"
+    curl -s -H "Priority: 4" -d "\$MESSAGE" "https://ntfy.sh/\$TOPIC"
 fi
 TEMPLATE
 
@@ -62,7 +62,7 @@ curl -s \\
   -H "Priority: 4" \\
   -H "Actions: http, 5m, https://ntfy.sh/\$TOPIC, headers.In=5m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 5m); http, 15m, https://ntfy.sh/\$TOPIC, headers.In=15m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 15m); http, 30m, https://ntfy.sh/\$TOPIC, headers.In=30m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 30m)" \\
   -d "\$MESSAGE" \\
-  "ntfy.sh/\$TOPIC"
+  "https://ntfy.sh/\$TOPIC"
 TEMPLATE
 
 # --- schedule.sh ---
@@ -78,13 +78,11 @@ MESSAGE="\${2:?Usage: schedule.sh <delay> <message> [sequence_id] [title]}"
 SEQ_ID="\${3:-}"
 TITLE="\${4:-}"
 
-URL="ntfy.sh/\$TOPIC"
-[ -n "\$SEQ_ID" ] && URL="\$URL/\$SEQ_ID"
-
 HEADERS=(-H "In: \$DELAY" -H "Priority: 4")
+[ -n "\$SEQ_ID" ] && HEADERS+=(-H "X-ID: \$SEQ_ID")
 [ -n "\$TITLE" ] && HEADERS+=(-H "Title: \$TITLE")
 
-curl -s "\${HEADERS[@]}" -d "\$MESSAGE" "\$URL"
+curl -s "\${HEADERS[@]}" -d "\$MESSAGE" "https://ntfy.sh/\$TOPIC"
 TEMPLATE
 
 # --- schedule_snooze.sh ---
@@ -101,16 +99,13 @@ MESSAGE="\${2:?Usage: schedule_snooze.sh <delay> <message> [sequence_id] [title]
 SEQ_ID="\${3:-}"
 TITLE="\${4:-Check-in time}"
 
-URL="ntfy.sh/\$TOPIC"
-[ -n "\$SEQ_ID" ] && URL="\$URL/\$SEQ_ID"
+HEADERS=(-H "In: \$DELAY" -H "Title: \$TITLE" -H "Priority: 4")
+[ -n "\$SEQ_ID" ] && HEADERS+=(-H "X-ID: \$SEQ_ID")
 
-curl -s \\
-  -H "In: \$DELAY" \\
-  -H "Title: \$TITLE" \\
-  -H "Priority: 4" \\
+curl -s "\${HEADERS[@]}" \\
   -H "Actions: http, 5m, https://ntfy.sh/\$TOPIC, headers.In=5m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 5m); http, 15m, https://ntfy.sh/\$TOPIC, headers.In=15m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 15m); http, 30m, https://ntfy.sh/\$TOPIC, headers.In=30m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 30m)" \\
   -d "\$MESSAGE" \\
-  "\$URL"
+  "https://ntfy.sh/\$TOPIC"
 TEMPLATE
 
 # --- cancel.sh ---
@@ -122,40 +117,50 @@ cat > "$TEMP_DIR/scripts/cancel.sh" << TEMPLATE
 TOPIC="$TOPIC"
 SEQ_ID="\${1:?Usage: cancel.sh <sequence_id>}"
 
-curl -s -X DELETE "ntfy.sh/\$TOPIC/\$SEQ_ID"
+curl -s -X DELETE "https://ntfy.sh/\$TOPIC/\$SEQ_ID"
 TEMPLATE
 
 # --- start_checkin.sh ---
 cat > "$TEMP_DIR/scripts/start_checkin.sh" << TEMPLATE
 #!/bin/bash
-# Start a full check-in: primary notification with snooze buttons + backup pings
-# Backups are scheduled at +5m and +10m with sequence IDs for cancellation
+# Start a full check-in: immediate notification with snooze buttons + backup pings
+# Backups are scheduled at +5m and +10m with message IDs for cancellation
 # Usage: start_checkin.sh <message> [session_id] [title]
-# Session ID is used to create unique sequence IDs (default: "checkin")
 
 TOPIC="$TOPIC"
 MESSAGE="\${1:?Usage: start_checkin.sh <message> [session_id] [title]}"
 SESSION="\${2:-checkin}"
 TITLE="\${3:-Check-in time}"
 
-# Primary notification with snooze buttons
+# Primary notification with snooze buttons (immediate)
 curl -s \\
+  -H "X-ID: \${SESSION}-primary" \\
   -H "Title: \$TITLE" \\
   -H "Priority: 4" \\
   -H "Actions: http, 5m, https://ntfy.sh/\$TOPIC, headers.In=5m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 5m); http, 15m, https://ntfy.sh/\$TOPIC, headers.In=15m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 15m); http, 30m, https://ntfy.sh/\$TOPIC, headers.In=30m, headers.Title=Snoozed, body=⏰ \$MESSAGE (snoozed 30m)" \\
   -d "\$MESSAGE" \\
-  "ntfy.sh/\$TOPIC/\${SESSION}-primary"
+  "https://ntfy.sh/\$TOPIC"
 
-# Backup pings at +5m and +10m
-curl -s -H "In: 5m" -H "Priority: 4" -H "Title: Still there?" \\
-  -d "Backup: \$MESSAGE" "ntfy.sh/\$TOPIC/\${SESSION}-backup1"
+# Backup ping at +5m
+curl -s \\
+  -H "X-ID: \${SESSION}-backup1" \\
+  -H "In: 5m" \\
+  -H "Priority: 4" \\
+  -H "Title: Still there?" \\
+  -d "Backup: \$MESSAGE" \\
+  "https://ntfy.sh/\$TOPIC"
 
-curl -s -H "In: 10m" -H "Priority: 5" -H "Title: Persistent ping" \\
-  -d "Backup #2: \$MESSAGE" "ntfy.sh/\$TOPIC/\${SESSION}-backup2"
+# Backup ping at +10m
+curl -s \\
+  -H "X-ID: \${SESSION}-backup2" \\
+  -H "In: 10m" \\
+  -H "Priority: 5" \\
+  -H "Title: Persistent ping" \\
+  -d "Backup #2: \$MESSAGE" \\
+  "https://ntfy.sh/\$TOPIC"
 
-echo ""
 echo "Check-in started. Session: \$SESSION"
-echo "Backup sequence IDs: \${SESSION}-backup1, \${SESSION}-backup2"
+echo "Backups scheduled: +5m (\${SESSION}-backup1), +10m (\${SESSION}-backup2)"
 TEMPLATE
 
 # --- cancel_backups.sh ---
@@ -163,20 +168,97 @@ cat > "$TEMP_DIR/scripts/cancel_backups.sh" << TEMPLATE
 #!/bin/bash
 # Cancel backup pings for a check-in session
 # Usage: cancel_backups.sh [session_id]
-# Session ID must match what was used in start_checkin.sh (default: "checkin")
 
 TOPIC="$TOPIC"
 SESSION="\${1:-checkin}"
 
-# Sleep to avoid race condition (in case this is called right after scheduling)
+# Sleep to avoid race condition (ntfy needs time to register scheduled messages)
 sleep 2
 
-curl -s -X DELETE "ntfy.sh/\$TOPIC/\${SESSION}-backup1"
-curl -s -X DELETE "ntfy.sh/\$TOPIC/\${SESSION}-backup2"
+curl -s -X DELETE "https://ntfy.sh/\$TOPIC/\${SESSION}-backup1"
+curl -s -X DELETE "https://ntfy.sh/\$TOPIC/\${SESSION}-backup2"
 
-echo ""
 echo "Canceled backups for session: \$SESSION"
 TEMPLATE
+
+# --- checkin_after.sh ---
+cat > "$TEMP_DIR/scripts/checkin_after.sh" << 'TEMPLATE'
+#!/bin/bash
+# Schedule a check-in after a delay, with automatic backup pings
+# This is the recommended script for Claude to schedule check-ins
+# Usage: checkin_after.sh <delay> [message] [session_id]
+# Delay format: 30m, 1h, 45m, 90s, etc.
+
+TOPIC="TOPIC_PLACEHOLDER"
+DELAY="${1:?Usage: checkin_after.sh <delay> [message] [session_id]}"
+MESSAGE="${2:-Time for a check-in!}"
+SESSION="${3:-checkin}"
+
+# Parse delay into seconds
+parse_delay() {
+    local val="${1%[smhSMH]}"
+    local unit="${1: -1}"
+    case "$unit" in
+        s|S) echo "$val" ;;
+        m|M) echo $((val * 60)) ;;
+        h|H) echo $((val * 3600)) ;;
+        *) echo "$1" ;;  # assume seconds if no unit
+    esac
+}
+
+# Convert seconds back to ntfy format (use minutes for readability)
+secs_to_delay() {
+    local secs="$1"
+    if (( secs >= 3600 && secs % 3600 == 0 )); then
+        echo "$((secs / 3600))h"
+    elif (( secs >= 60 )); then
+        echo "$((secs / 60))m"
+    else
+        echo "${secs}s"
+    fi
+}
+
+BASE_SECS=$(parse_delay "$DELAY")
+BACKUP1_SECS=$((BASE_SECS + 300))   # +5 minutes
+BACKUP2_SECS=$((BASE_SECS + 600))   # +10 minutes
+
+BACKUP1_DELAY=$(secs_to_delay $BACKUP1_SECS)
+BACKUP2_DELAY=$(secs_to_delay $BACKUP2_SECS)
+
+# Primary notification with snooze buttons
+curl -s \
+  -H "X-ID: ${SESSION}-primary" \
+  -H "In: $DELAY" \
+  -H "Title: Check-in time" \
+  -H "Priority: 4" \
+  -H "Actions: http, 5m, https://ntfy.sh/$TOPIC, headers.In=5m, headers.Title=Snoozed, body=⏰ $MESSAGE (snoozed 5m); http, 15m, https://ntfy.sh/$TOPIC, headers.In=15m, headers.Title=Snoozed, body=⏰ $MESSAGE (snoozed 15m); http, 30m, https://ntfy.sh/$TOPIC, headers.In=30m, headers.Title=Snoozed, body=⏰ $MESSAGE (snoozed 30m)" \
+  -d "$MESSAGE" \
+  "https://ntfy.sh/$TOPIC"
+
+# Backup ping at delay+5m
+curl -s \
+  -H "X-ID: ${SESSION}-backup1" \
+  -H "In: $BACKUP1_DELAY" \
+  -H "Priority: 4" \
+  -H "Title: Still there?" \
+  -d "Backup: $MESSAGE" \
+  "https://ntfy.sh/$TOPIC"
+
+# Backup ping at delay+10m
+curl -s \
+  -H "X-ID: ${SESSION}-backup2" \
+  -H "In: $BACKUP2_DELAY" \
+  -H "Priority: 5" \
+  -H "Title: Persistent ping" \
+  -d "Backup #2: $MESSAGE" \
+  "https://ntfy.sh/$TOPIC"
+
+echo "Scheduled check-in in $DELAY (backups at $BACKUP1_DELAY, $BACKUP2_DELAY)"
+echo "Session: $SESSION"
+TEMPLATE
+
+# Replace placeholder with actual topic (can't use $TOPIC directly in single-quoted heredoc)
+sed -i "s/TOPIC_PLACEHOLDER/$TOPIC/" "$TEMP_DIR/scripts/checkin_after.sh"
 
 # Make all scripts executable
 chmod +x "$TEMP_DIR/scripts/"*.sh
@@ -192,15 +274,32 @@ description: Send persistent, snoozeable notifications via ntfy.sh for accountab
 
 Send notifications to ntfy.sh topic \`$TOPIC\`. **Run these scripts using the Bash tool.**
 
-All scripts use Priority 4 (high) by default.
+## Quick Start
+
+**Schedule a check-in with backup pings:**
+\`\`\`bash
+bash scripts/checkin_after.sh 45m
+\`\`\`
+
+**Cancel backups when user arrives:**
+\`\`\`bash
+bash scripts/cancel_backups.sh
+\`\`\`
 
 ## Primary Scripts
 
-**schedule_snooze.sh** - Schedule a notification with snooze buttons (5m/15m/30m)
+**checkin_after.sh** - Schedule a check-in after a delay (with automatic backup pings)
 \`\`\`bash
-bash scripts/schedule_snooze.sh <delay> <message> [sequence_id] [title]
-# Example: bash scripts/schedule_snooze.sh 45m "Time for a check-in!" "next-checkin" "Check-in"
+bash scripts/checkin_after.sh <delay> [message] [session_id]
+# Examples:
+bash scripts/checkin_after.sh 30m                          # Check-in in 30 minutes
+bash scripts/checkin_after.sh 1h "How's the project?"      # Custom message
+bash scripts/checkin_after.sh 45m "Break time" myproject   # Custom session ID
 \`\`\`
+Automatically schedules:
+- Primary notification at \`<delay>\` with snooze buttons
+- Backup ping at \`<delay> + 5m\`
+- Backup ping at \`<delay> + 10m\`
 
 **cancel_backups.sh** - Cancel pending backup pings (call when user arrives)
 \`\`\`bash
@@ -209,9 +308,9 @@ bash scripts/cancel_backups.sh [session_id]
 
 ## Other Scripts
 
-**send.sh** - Send immediate notification
+**start_checkin.sh** - Immediate notification + backup pings at +5m and +10m
 \`\`\`bash
-bash scripts/send.sh <message> [title]
+bash scripts/start_checkin.sh <message> [session_id] [title]
 \`\`\`
 
 **send_snooze.sh** - Send immediate notification with snooze buttons
@@ -219,19 +318,24 @@ bash scripts/send.sh <message> [title]
 bash scripts/send_snooze.sh <message> [title]
 \`\`\`
 
-**schedule.sh** - Schedule notification (no snooze buttons)
+**schedule_snooze.sh** - Schedule notification with snooze buttons (no backups)
+\`\`\`bash
+bash scripts/schedule_snooze.sh <delay> <message> [sequence_id] [title]
+\`\`\`
+
+**send.sh** - Send immediate notification (no snooze)
+\`\`\`bash
+bash scripts/send.sh <message> [title]
+\`\`\`
+
+**schedule.sh** - Schedule notification (no snooze, no backups)
 \`\`\`bash
 bash scripts/schedule.sh <delay> <message> [sequence_id] [title]
 \`\`\`
 
-**cancel.sh** - Cancel a specific scheduled notification
+**cancel.sh** - Cancel a specific scheduled notification by ID
 \`\`\`bash
 bash scripts/cancel.sh <sequence_id>
-\`\`\`
-
-**start_checkin.sh** - Immediate notification + backup pings at +5m and +10m
-\`\`\`bash
-bash scripts/start_checkin.sh <message> [session_id] [title]
 \`\`\`
 
 ## Typical Workflow
@@ -245,14 +349,14 @@ bash scripts/start_checkin.sh <message> [session_id] [title]
 
 3. Schedule next check-in:
    \`\`\`bash
-   bash scripts/schedule_snooze.sh 45m "How's it going?" "next-checkin" "Check-in"
+   bash scripts/checkin_after.sh 45m
    \`\`\`
 
 ## Notes
 
-- Delay format: 5m, 1h, 30s, etc.
-- Priority levels: 1-5 (scripts default to 4, which causes prominent buzzing)
-- For absolute times, use curl directly with \`-H "At: 3:30pm"\`
+- Delay format: 30m, 1h, 90s, etc.
+- All scripts use Priority 4 (high) which causes prominent phone buzzing
+- Backup pings use Priority 5 (max) for persistence
 TEMPLATE
 
 # Create .skill file (zip archive)
