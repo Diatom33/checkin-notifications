@@ -11,14 +11,16 @@ A Claude skill for sending persistent, snoozeable notifications via [ntfy.sh](ht
    echo 'your-topic-name' > .channel
    ```
 
-3. Generate the skill file:
+3. Edit `SKILL.md` if you want to customize the skill instructions (the placeholder `{{TOPIC}}` gets replaced automatically)
+
+4. Generate the skill file:
    ```bash
    ./generate.sh
    ```
 
-4. Install the generated `checkin-notifications.skill` in claude.ai or Claude Code
+5. Install the generated `checkin-notifications.skill` in claude.ai or Claude Code
 
-5. Subscribe to your topic in the ntfy app on your phone
+6. Subscribe to your topic in the ntfy app on your phone
 
 ## What's in the Skill
 
